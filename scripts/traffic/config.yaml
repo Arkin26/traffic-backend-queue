@@ -1,0 +1,13 @@
+# Traffic simulator defaults (override with env)
+base_url: http://localhost:8080
+admin_key: dev-admin-key
+
+scenarios:
+  launch_spike:
+    max_vus: 500
+    error_rate_max: 0.01
+    join_p99_ms: 500
+  queue_fairness:
+    inversions_max: 0
+  refresh_storm:
+    position_changes_max: 0

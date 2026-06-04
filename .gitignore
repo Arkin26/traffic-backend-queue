@@ -1,0 +1,7 @@
+/dist/
+/bin/
+/tmp/
+*.sum.bak
+.env
+deploy/.env
+docs/load-test-results/*.json

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Traffic — Load Control Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>TRAFFIC</h1>
+    <p>Load Control Center — k6-backed performance lab</p>
+  </header>
+
+  <main>
+    <section class="panel control-panel">
+      <h2>Run configuration</h2>
+      <p class="hint">Start a serious load test with k6. Tune virtual users, ramps, and sale capacity.</p>
+      <p id="deployHint" class="hint"></p>
+
+      <label id="demoKeyRow" class="field hidden">
+        <span>Demo access key</span>
+        <input type="password" id="demoKey" placeholder="Required on shared deployments" autocomplete="off" />
+      </label>
+
+      <div class="presets">
+        <span class="preset-label">Presets:</span>
+        <button type="button" class="btn-chip" data-preset="launch">T+0 launch</button>
+        <button type="button" class="btn-chip" data-preset="refresh">Refresh storm</button>
+        <button type="button" class="btn-chip" data-preset="fairness">Fairness audit</button>
+        <button type="button" class="btn-chip" data-preset="bots">Bot checkout</button>
+        <button type="button" class="btn-chip" data-preset="mixed">Mixed realistic</button>
+      </div>
+
+      <label class="field">
+        <span>Scenario</span>
+        <select id="scenario"></select>
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Peak VUs <strong id="vusVal">500</strong></span>
+          <input type="range" id="vusMax" min="10" max="1000" step="10" value="500" />
+        </label>
+        <label class="field">
+          <span>Ramp up</span>
+          <input type="text" id="rampUp" value="10s" />
+        </label>
+        <label class="field">
+          <span>Steady</span>
+          <input type="text" id="steady" value="30s" />
+        </label>
+        <label class="field">
+          <span>Ramp down</span>
+          <input type="text" id="rampDown" value="10s" />
+        </label>
+      </div>
+
+      <h3 class="subhead">Sale settings</h3>
+      <div class="grid-2">
+        <label class="field">
+          <span>Admit / min</span>
+          <input type="number" id="admitPerMin" value="6000" min="100" step="100" />
+        </label>
+        <label class="field">
+          <span>Waiting room cap</span>
+          <input type="number" id="waitingRoomCap" value="100000" min="1000" step="1000" />
+        </label>
+        <label class="field">
+          <span>Total seats</span>
+          <input type="number" id="totalSeats" value="500" min="50" step="50" />
+        </label>
+        <label class="field">
+          <span>Sale ID</span>
+          <input type="text" id="saleId" placeholder="auto on reset" readonly />
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="btnStart" class="btn-primary">Start load test</button>
+        <button id="btnReset" class="btn-secondary">Reset sale</button>
+      </div>
+    </section>
+
+    <section class="panel status-panel">
+      <h2>Run status</h2>
+      <div id="runBadge" class="run-badge idle">Idle</div>
+      <p id="runMeta" class="muted">No active run</p>
+
+      <div id="resultCard" class="result-card hidden">
+        <div id="resultVerdict" class="verdict">—</div>
+        <ul id="resultFailures" class="failures"></ul>
+        <div class="result-metrics">
+          <div><span>p99</span><strong id="resP99">—</strong></div>
+          <div><span>Error rate</span><strong id="resErr">—</strong></div>
+          <div><span>Requests</span><strong id="resReqs">—</strong></div>
+        </div>
+      </div>
+
+      <h3 class="subhead">Recent runs</h3>
+      <ul id="runHistory" class="run-history"></ul>
+
+      <details class="advanced">
+        <summary>Advanced: single user (optional)</summary>
+        <div class="advanced-body">
+          <div class="row">
+            <input id="email" type="email" placeholder="you@email.com" />
+            <button id="btnRegister" class="btn-secondary">Register & join</button>
+          </div>
+          <div id="userInfo" class="muted"></div>
+          <div class="queue-box">
+            <div class="stat"><span>Position</span><strong id="position">—</strong></div>
+            <div class="stat"><span>Ahead</span><strong id="ahead">—</strong></div>
+            <div class="stat"><span>Status</span><strong id="admitted">waiting</strong></div>
+          </div>
+          <p id="queueMessage" class="message"></p>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <aside id="monitor" class="monitor">
+    <div class="monitor-inner">
+      <h3>Live performance</h3>
+      <div class="health" id="health">—</div>
+      <canvas id="sparkline" width="280" height="48" aria-hidden="true"></canvas>
+      <ul class="metrics">
+        <li><span>Queue depth</span><strong id="mQueue">0</strong></li>
+        <li><span>Admitted</span><strong id="mAdmitted">0</strong></li>
+        <li><span>Tickets sold</span><strong id="mTickets">0</strong></li>
+        <li><span>Available seats</span><strong id="mSeats">0</strong></li>
+        <li><span>Sim requests</span><strong id="mReq">0</strong></li>
+        <li><span>Blocked</span><strong id="mBlocked">0</strong></li>
+        <li><span>Error rate</span><strong id="mErr">0%</strong></li>
+        <li><span>Last latency</span><strong id="mLat">0 ms</strong></li>
+        <li><span>Req / sec</span><strong id="mRps">0</strong></li>
+      </ul>
+      <p class="active" id="mActive">Ready for load test</p>
+    </div>
+  </aside>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: traffic
+      POSTGRES_PASSWORD: traffic
+      POSTGRES_DB: traffic
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traffic"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: /usr/local/bin/api
+    environment:
+      DATABASE_URL: postgres://traffic:traffic@postgres:5432/traffic?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret-change-in-production
+      ADMIN_API_KEY: dev-admin-key
+      HTTP_ADDR: ":8080"
+      SIMULATION_BASE_URL: http://127.0.0.1:8080
+      LOADTEST_JOBS_DIR: /loadtest/jobs
+      LOADTEST_RESULTS_DIR: /loadtest/results
+    ports:
+      - "8080:8080"
+    volumes:
+      - loadtest_jobs:/loadtest/jobs
+      - loadtest_results:/loadtest/results
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: /usr/local/bin/worker
+    environment:
+      DATABASE_URL: postgres://traffic:traffic@postgres:5432/traffic?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  loadtest-runner:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.loadtest-runner
+    user: "0:0"
+    profiles: ["loadtest"]
+    environment:
+      BASE_URL: http://api:8080
+      ADMIN_KEY: dev-admin-key
+      LOADTEST_JOBS_DIR: /loadtest/jobs
+      LOADTEST_RESULTS_DIR: /loadtest/results
+      K6_SCRIPTS_DIR: /scripts
+    volumes:
+      - ../scripts/traffic:/scripts
+      - loadtest_jobs:/loadtest/jobs
+      - loadtest_results:/loadtest/results
+    depends_on:
+      api:
+        condition: service_started
+
+  k6:
+    image: grafana/k6:latest
+    profiles: ["loadtest"]
+    volumes:
+      - ../scripts/traffic:/scripts
+      - loadtest_results:/loadtest/results
+    environment:
+      BASE_URL: http://api:8080
+      ADMIN_KEY: dev-admin-key
+    depends_on:
+      - api
+    entrypoint: ["sleep", "infinity"]
+
+volumes:
+  pgdata:
+  loadtest_jobs:
+  loadtest_results:

@@ -1,0 +1,95 @@
+# Pull-only stack for testers (no source build). Set image names in .env.
+name: traffic-lab
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: traffic
+      POSTGRES_PASSWORD: traffic
+      POSTGRES_DB: traffic
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traffic"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+
+  api:
+    image: ${TRAFFIC_API_IMAGE:?set TRAFFIC_API_IMAGE in .env}
+    restart: unless-stopped
+    command: /usr/local/bin/api
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://traffic:traffic@postgres:5432/traffic?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
+      DEMO_API_KEY: ${DEMO_API_KEY:-}
+      HTTP_ADDR: ":8080"
+      SIMULATION_BASE_URL: http://127.0.0.1:8080
+      LOADTEST_JOBS_DIR: /loadtest/jobs
+      LOADTEST_RESULTS_DIR: /loadtest/results
+      DEMO_AUTO_SETUP: "true"
+      LOADTEST_MAX_VUS: ${LOADTEST_MAX_VUS:-200}
+      LOADTEST_MAX_QUEUE: ${LOADTEST_MAX_QUEUE:-2}
+      LOADTEST_MAX_CONCURRENT: "1"
+      LOADTEST_MAX_STEADY_SEC: ${LOADTEST_MAX_STEADY_SEC:-90}
+      LOADTEST_DEFAULT_VUS: ${LOADTEST_DEFAULT_VUS:-80}
+    volumes:
+      - loadtest_jobs:/loadtest/jobs
+      - loadtest_results:/loadtest/results
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ${TRAFFIC_API_IMAGE}
+    restart: unless-stopped
+    command: /usr/local/bin/worker
+    environment:
+      DATABASE_URL: postgres://traffic:traffic@postgres:5432/traffic?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  loadtest-runner:
+    image: ${TRAFFIC_LOADTEST_IMAGE:?set TRAFFIC_LOADTEST_IMAGE in .env}
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      BASE_URL: http://api:8080
+      ADMIN_KEY: ${ADMIN_API_KEY:-dev-admin-key}
+      LOADTEST_JOBS_DIR: /loadtest/jobs
+      LOADTEST_RESULTS_DIR: /loadtest/results
+      K6_SCRIPTS_DIR: /scripts
+    volumes:
+      - loadtest_jobs:/loadtest/jobs
+      - loadtest_results:/loadtest/results
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  pgdata:
+  loadtest_jobs:
+  loadtest_results:

@@ -1,0 +1,15 @@
+FROM golang:1.22-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download
+COPY go.sum* ./
+COPY . .
+RUN CGO_ENABLED=0 go build -o /loadtest-runner ./cmd/loadtest-runner
+
+FROM grafana/k6:latest
+USER root
+COPY --from=build /loadtest-runner /usr/local/bin/loadtest-runner
+COPY deploy/loadtest-entrypoint.sh /entrypoint.sh
+COPY scripts/traffic /scripts
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
